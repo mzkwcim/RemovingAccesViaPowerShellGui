@@ -1,0 +1,74 @@
+# Dodawanie zewnętrznej biblioteki System.Windows.Forms
+Add-Type -AssemblyName System.Windows.Forms
+
+# Tworzenie nowego obiektu okna
+$mainForm = New-Object System.Windows.Forms.Form
+$mainForm.Text = "Usuwanie uprawnień"
+$mainForm.Size = New-Object System.Drawing.Size(500, 400)
+
+# Etykieta nad polem tekstowym
+$labelPath = New-Object System.Windows.Forms.Label
+$labelPath.Text = "Wprowadź ścieżkę do katalogu:"
+$labelPath.Location = New-Object System.Drawing.Point(10, 10)
+$labelPath.Width = 300
+$mainForm.Controls.Add($labelPath)
+
+# Pole tekstowe do wpisywania ścieżki
+$textBoxPath = New-Object System.Windows.Forms.TextBox
+$textBoxPath.Location = New-Object System.Drawing.Point(10, 30)
+$textBoxPath.Size = New-Object System.Drawing.Size(400, 20)
+$mainForm.Controls.Add($textBoxPath)
+
+# Dodawanie przycisku "Zatwierdź" pod pierwszym polem tekstowym
+$buttonSubmitPath = New-Object System.Windows.Forms.Button
+$buttonSubmitPath.Text = "Zatwierdź"
+$buttonSubmitPath.Location = New-Object System.Drawing.Point(10, 60)
+$buttonSubmitPath.Add_Click({
+    $directory = $textBoxPath.Text
+    $directories = Get-ChildItem $directory | ForEach-Object { (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -is [System.Security.Principal.NTAccount] } | Select-Object -ExpandProperty IdentityReference } | ForEach-Object { $_.ToString().ToLower() } | Select-Object -Unique
+    
+    # Dodawanie wyników bezpośrednio do pola tekstowego z nową linią po każdym wyniku
+    $directories -split "`r`n" | ForEach-Object {
+        $resultsTextBox.AppendText("`r`n$_")
+    }
+})
+$mainForm.Controls.Add($buttonSubmitPath)
+
+# Etykieta pod przyciskiem "Zatwierdź"
+$labelGroups = New-Object System.Windows.Forms.Label
+$labelGroups.Text = "Wprowadź grupy do usunięcia uprawnień:"
+$labelGroups.Location = New-Object System.Drawing.Point(10, 90)
+$labelGroups.Width = 300
+$mainForm.Controls.Add($labelGroups)
+
+# Pole tekstowe do wprowadzania grup do usunięcia uprawnień
+$textBoxGroups = New-Object System.Windows.Forms.TextBox
+$textBoxGroups.Location = New-Object System.Drawing.Point(10, 110)
+$textBoxGroups.Size = New-Object System.Drawing.Size(400, 20)
+$mainForm.Controls.Add($textBoxGroups)
+
+# Przycisk "Zatwierdź komendę" pod drugim polem tekstowym
+$buttonSubmitCommand = New-Object System.Windows.Forms.Button
+$buttonSubmitCommand.Text = "Zatwierdź komendę"
+$buttonSubmitCommand.Location = New-Object System.Drawing.Point(10, 140)
+$buttonSubmitCommand.Width = 150
+$buttonSubmitCommand.Add_Click({
+    $command = $textBoxGroups.Text
+    ForEach ($dir in (Get-ChildItem $textBoxPath.Text).FullName) {
+        $acl = Get-Acl $dir
+        $acl.Access | Where-Object { $_.IdentityReference.Value -eq $command } | ForEach-Object { $acl.RemoveAccessRule($_) }
+        Set-Acl -Path $dir -AclObject $acl
+    }
+})
+$mainForm.Controls.Add($buttonSubmitCommand)
+
+# Pole tekstowe do wyświetlania wyników
+$resultsTextBox = New-Object System.Windows.Forms.TextBox
+$resultsTextBox.Location = New-Object System.Drawing.Point(10, 170)
+$resultsTextBox.Size = New-Object System.Drawing.Size(400, 100)
+$resultsTextBox.Multiline = $true
+$resultsTextBox.ScrollBars = "Both"
+$mainForm.Controls.Add($resultsTextBox)
+
+# Uruchamianie głównej pętli GUI
+[System.Windows.Forms.Application]::Run($mainForm)
