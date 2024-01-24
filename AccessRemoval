@@ -46,16 +46,25 @@ $textBoxPath.Location = New-Object System.Drawing.Point(10, 30)
 $textBoxPath.Size = New-Object System.Drawing.Size(400, 20)
 $mainForm.Controls.Add($textBoxPath)
 
+# Przycisk "Zatwierdź" pod pierwszym polem tekstowym
 $buttonSubmitPath = New-Object System.Windows.Forms.Button
 $buttonSubmitPath.Text = "Zatwierdź"
 $buttonSubmitPath.Location = New-Object System.Drawing.Point(10, 60)
 $buttonSubmitPath.Add_Click({
     $directory = $textBoxPath.Text
-    $directories = Get-ChildItem $directory | ForEach-Object { (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -is [System.Security.Principal.NTAccount] } | Select-Object -ExpandProperty IdentityReference } | ForEach-Object { $_.ToString().ToLower() } | Select-Object -Unique
+
+    # Sprawdzenie, czy wprowadzony tekst jest poprawną ścieżką katalogu
+    if (Test-Path $directory -PathType Container) {
+        $directories = Get-ChildItem $directory | ForEach-Object { (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -is [System.Security.Principal.NTAccount] } | Select-Object -ExpandProperty IdentityReference } | ForEach-Object { $_.ToString().ToLower() } | Select-Object -Unique
     
-    # Dodawanie wyników bezpośrednio do pola tekstowego z nową linią po każdym wyniku
-    $directories -split "`r`n" | ForEach-Object {
-        $resultsTextBox.AppendText("`r`n$_")
+        # Dodawanie wyników bezpośrednio do pola tekstowego z nową linią po każdym wyniku
+        $directories -split "`r`n" | ForEach-Object {
+            $resultsTextBox.AppendText("`r`n$_")
+        }
+        $buttonInheritance.Enabled = $true
+    } else {
+        # Jeśli wprowadzony tekst nie jest poprawną ścieżką katalogu, wyświetl komunikat
+        [System.Windows.Forms.MessageBox]::Show("Wprowadzona ścieżka nie jest poprawna.", "Błąd", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 })
 $mainForm.Controls.Add($buttonSubmitPath)
@@ -72,25 +81,42 @@ $textBoxGroups.Location = New-Object System.Drawing.Point(10, 110)
 $textBoxGroups.Size = New-Object System.Drawing.Size(400, 20)
 $mainForm.Controls.Add($textBoxGroups)
 
+# Przycisk "Zatwierdź komendę" pod drugim polem tekstowym
 $buttonSubmitCommand = New-Object System.Windows.Forms.Button
 $buttonSubmitCommand.Text = "Zatwierdź komendę"
 $buttonSubmitCommand.Location = New-Object System.Drawing.Point(10, 140)
 $buttonSubmitCommand.Width = 150
 $buttonSubmitCommand.Add_Click({
     $command = $textBoxGroups.Text
-    ForEach ($dir in (Get-ChildItem $textBoxPath.Text).FullName) {
-        $acl = Get-Acl $dir
-        $acl.Access | Where-Object { $_.IdentityReference.Value -eq $command } | ForEach-Object { $acl.RemoveAccessRule($_) }
-        Set-Acl -Path $dir -AclObject $acl
+    $availableGroups = $resultsTextBox.Text -split "`r`n" | Where-Object { $_.Trim() -ne "" }
+
+    # Sprawdzenie, czy wprowadzona grupa istnieje wśród dostępnych grup
+    if ($availableGroups -contains $command) {
+        ForEach ($dir in (Get-ChildItem $textBoxPath.Text).FullName) {
+            $acl = Get-Acl $dir
+            $acl.Access | Where-Object { $_.IdentityReference.Value -eq $command } | ForEach-Object { $acl.RemoveAccessRule($_) }
+            Set-Acl -Path $dir -AclObject $acl
+        }
+    } else {
+        # Jeśli wprowadzona grupa nie istnieje, wyświetl komunikat o błędzie
+        [System.Windows.Forms.MessageBox]::Show("Wprowadzona grupa nie istnieje.", "Błąd", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 })
 $mainForm.Controls.Add($buttonSubmitCommand)
 
+# Przycisk "Dziedziczenie" pod drugim polem tekstowym
 $buttonInheritance = New-Object System.Windows.Forms.Button
 $buttonInheritance.Text = "Dziedziczenie"
 $buttonInheritance.Location = New-Object System.Drawing.Point(10, 200)
 $buttonInheritance.Width = 150
+$buttonInheritance.Enabled = $null  # Ustaw na stan nieokreślony
 $buttonInheritance.Add_Click({
+    # Sprawdź, czy wprowadzono ścieżkę
+    if ($textBoxPath.Text -eq "") {
+        [System.Windows.Forms.MessageBox]::Show("Aby usunąć dziedziczenie, wprowadź ścieżkę do katalogu.", "Brak ścieżki", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        return
+    }
+
     $confirmMessage = "Czy chcesz wyłączyć dziedziczenie?"
     $confirmTitle = "Potwierdzenie"
     $result = Show-ConfirmationDialog -message $confirmMessage -title $confirmTitle
@@ -111,17 +137,14 @@ $buttonInheritance.Add_Click({
         }
     }
 })
+
+# Dodanie obsługi zdarzenia TextChanged dla pierwszego pola tekstowego
+$textBoxPath.Add_TextChanged({
+    # Jeśli pierwsze pole tekstowe nie jest puste, aktywuj przycisk "Dziedziczenie"
+    $buttonInheritance.Enabled = $textBoxPath.Text -ne ""
+})
 $mainForm.Controls.Add($buttonInheritance)
 
-$inheritanceForm.Add_FormClosing({
-    $confirmMessage = "Czy na pewno chcesz zamknąć to okno?"
-    $confirmTitle = "Potwierdzenie zamknięcia"
-    $result = Show-ConfirmationDialog -message $confirmMessage -title $confirmTitle
-
-    if (-not $result) {
-        $_.Cancel = $true  # Zatrzymaj zamknięcie okna, jeśli użytkownik nie potwierdzi
-    }
-})
 
 $resultsTextBox = New-Object System.Windows.Forms.TextBox
 $resultsTextBox.Location = New-Object System.Drawing.Point(10, 230)  # Przesunięcie pola tekstowego
