@@ -1,25 +1,51 @@
-# Dodawanie zewnętrznej biblioteki System.Windows.Forms
 Add-Type -AssemblyName System.Windows.Forms
 
-# Tworzenie nowego obiektu okna
+function Show-ConfirmationDialog {
+    param (
+        [string]$message,
+        [string]$title
+    )
+
+    $msgBoxInput = [System.Windows.Forms.MessageBox]::Show($message, $title, [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
+
+    if ($msgBoxInput -eq [System.Windows.Forms.DialogResult]::Yes) {
+        return $true
+    } else {
+        return $false
+    }
+}
+
+function Show-CommandConfirmationDialog {
+    param (
+        [string]$message,
+        [string]$title
+    )
+
+    $msgBoxInput = [System.Windows.Forms.MessageBox]::Show($message, $title, [System.Windows.Forms.MessageBoxButtons]::OKCancel, [System.Windows.Forms.MessageBoxIcon]::Information)
+
+    if ($msgBoxInput -eq [System.Windows.Forms.DialogResult]::OK) {
+        return $true
+    } else {
+        return $false
+    }
+}
+
 $mainForm = New-Object System.Windows.Forms.Form
 $mainForm.Text = "Usuwanie uprawnień"
 $mainForm.Size = New-Object System.Drawing.Size(500, 400)
 
-# Etykieta nad polem tekstowym
 $labelPath = New-Object System.Windows.Forms.Label
 $labelPath.Text = "Wprowadź ścieżkę do katalogu:"
 $labelPath.Location = New-Object System.Drawing.Point(10, 10)
 $labelPath.Width = 300
+$labelPath.Height = 15
 $mainForm.Controls.Add($labelPath)
 
-# Pole tekstowe do wpisywania ścieżki
 $textBoxPath = New-Object System.Windows.Forms.TextBox
 $textBoxPath.Location = New-Object System.Drawing.Point(10, 30)
 $textBoxPath.Size = New-Object System.Drawing.Size(400, 20)
 $mainForm.Controls.Add($textBoxPath)
 
-# Dodawanie przycisku "Zatwierdź" pod pierwszym polem tekstowym
 $buttonSubmitPath = New-Object System.Windows.Forms.Button
 $buttonSubmitPath.Text = "Zatwierdź"
 $buttonSubmitPath.Location = New-Object System.Drawing.Point(10, 60)
@@ -34,20 +60,18 @@ $buttonSubmitPath.Add_Click({
 })
 $mainForm.Controls.Add($buttonSubmitPath)
 
-# Etykieta pod przyciskiem "Zatwierdź"
 $labelGroups = New-Object System.Windows.Forms.Label
 $labelGroups.Text = "Wprowadź grupy do usunięcia uprawnień:"
 $labelGroups.Location = New-Object System.Drawing.Point(10, 90)
 $labelGroups.Width = 300
+$labelGroups.Height = 15
 $mainForm.Controls.Add($labelGroups)
 
-# Pole tekstowe do wprowadzania grup do usunięcia uprawnień
 $textBoxGroups = New-Object System.Windows.Forms.TextBox
 $textBoxGroups.Location = New-Object System.Drawing.Point(10, 110)
 $textBoxGroups.Size = New-Object System.Drawing.Size(400, 20)
 $mainForm.Controls.Add($textBoxGroups)
 
-# Przycisk "Zatwierdź komendę" pod drugim polem tekstowym
 $buttonSubmitCommand = New-Object System.Windows.Forms.Button
 $buttonSubmitCommand.Text = "Zatwierdź komendę"
 $buttonSubmitCommand.Location = New-Object System.Drawing.Point(10, 140)
@@ -62,13 +86,48 @@ $buttonSubmitCommand.Add_Click({
 })
 $mainForm.Controls.Add($buttonSubmitCommand)
 
-# Pole tekstowe do wyświetlania wyników
+$buttonInheritance = New-Object System.Windows.Forms.Button
+$buttonInheritance.Text = "Dziedziczenie"
+$buttonInheritance.Location = New-Object System.Drawing.Point(10, 200)
+$buttonInheritance.Width = 150
+$buttonInheritance.Add_Click({
+    $confirmMessage = "Czy chcesz wyłączyć dziedziczenie?"
+    $confirmTitle = "Potwierdzenie"
+    $result = Show-ConfirmationDialog -message $confirmMessage -title $confirmTitle
+
+    if ($result) {
+        $commandConfirmMessage = "Czy na pewno chcesz wyłączyć dziedziczenie?"
+        $commandConfirmTitle = "Potwierdzenie komendy"
+        $commandResult = Show-CommandConfirmationDialog -message $commandConfirmMessage -title $commandConfirmTitle
+
+        if ($commandResult) {
+            # Tutaj dodaj logikę dla wyłączenia dziedziczenia
+            $confirmationResult = foreach($dir in (Get-ChildItem $textBoxPath.Text).FullName ) {icacls $dir /inheritance:d}
+            $resultsTextBox.AppendText("`r`n$confirmationResult")
+
+            # Wywołaj komendę
+            $commandToExecute = "Write-Host 'Komenda została wykonana'"
+            Invoke-Expression -Command $commandToExecute
+        }
+    }
+})
+$mainForm.Controls.Add($buttonInheritance)
+
+$inheritanceForm.Add_FormClosing({
+    $confirmMessage = "Czy na pewno chcesz zamknąć to okno?"
+    $confirmTitle = "Potwierdzenie zamknięcia"
+    $result = Show-ConfirmationDialog -message $confirmMessage -title $confirmTitle
+
+    if (-not $result) {
+        $_.Cancel = $true  # Zatrzymaj zamknięcie okna, jeśli użytkownik nie potwierdzi
+    }
+})
+
 $resultsTextBox = New-Object System.Windows.Forms.TextBox
-$resultsTextBox.Location = New-Object System.Drawing.Point(10, 170)
+$resultsTextBox.Location = New-Object System.Drawing.Point(10, 230)  # Przesunięcie pola tekstowego
 $resultsTextBox.Size = New-Object System.Drawing.Size(400, 100)
 $resultsTextBox.Multiline = $true
 $resultsTextBox.ScrollBars = "Both"
 $mainForm.Controls.Add($resultsTextBox)
 
-# Uruchamianie głównej pętli GUI
 [System.Windows.Forms.Application]::Run($mainForm)
