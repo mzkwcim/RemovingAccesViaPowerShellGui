@@ -45,29 +45,50 @@ Add-Type -AssemblyName System.Windows.Forms
     $textBoxPath.Location = New-Object System.Drawing.Point(10, 30)
     $textBoxPath.Size = New-Object System.Drawing.Size(400, 20)
     $mainForm.Controls.Add($textBoxPath)
-
     # Przycisk "Zatwierdź" pod pierwszym polem tekstowym
     $buttonSubmitPath = New-Object System.Windows.Forms.Button
-    $buttonSubmitPath.Text = "Zatwierdź"
-    $buttonSubmitPath.Location = New-Object System.Drawing.Point(10, 60)
-    $buttonSubmitPath.Add_Click({
-        $directory = $textBoxPath.Text
+$buttonSubmitPath.Text = "Zatwierdź"
+$buttonSubmitPath.Location = New-Object System.Drawing.Point(10, 60)
 
-        # Sprawdzenie, czy wprowadzony tekst jest poprawną ścieżką katalogu
-        if (Test-Path $directory -PathType Container) {
-            $directories = Get-ChildItem $directory | ForEach-Object { (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -is [System.Security.Principal.NTAccount] } | Select-Object -ExpandProperty IdentityReference } | ForEach-Object { $_.ToString().ToLower() } | Select-Object -Unique
-    
-            # Dodawanie wyników bezpośrednio do pola tekstowego z nową linią po każdym wyniku
-            $directories -split "`r`n" | ForEach-Object {
-                $resultsTextBox.AppendText("`r`n$_")
-            }
-            $buttonInheritance.Enabled = $true
-        } else {
-            # Jeśli wprowadzony tekst nie jest poprawną ścieżką katalogu, wyświetl komunikat
-            [System.Windows.Forms.MessageBox]::Show("Wprowadzona ścieżka nie jest poprawna.", "Błąd", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+# Pole tekstowe z dostępnymi podfolderami danego folderu
+$availableDirectoriesTextBox = New-Object System.Windows.Forms.TextBox
+$availableDirectoriesTextBox.Location = New-Object System.Drawing.Point(230, 230)
+$availableDirectoriesTextBox.Size = New-Object System.Drawing.Size(200, 60)
+$availableDirectoriesTextBox.Multiline = $true
+$availableDirectoriesTextBox.ScrollBars = "Both"
+$mainForm.Controls.Add($availableDirectoriesTextBox)
+
+# Dodaj inicjalizację $availableGroupsTextBox
+$availableGroupsTextBox = New-Object System.Windows.Forms.TextBox
+$availableGroupsTextBox.Location = New-Object System.Drawing.Point(10, 230)
+$availableGroupsTextBox.Size = New-Object System.Drawing.Size(200, 60)
+$availableGroupsTextBox.Multiline = $true
+$availableGroupsTextBox.ScrollBars = "Both"
+$mainForm.Controls.Add($availableGroupsTextBox)
+
+$buttonSubmitPath.Add_Click({
+    $directory = $textBoxPath.Text
+
+    # Sprawdzenie, czy wprowadzony tekst jest poprawną ścieżką katalogu
+    if (Test-Path $directory -PathType Container) {
+        $directories = Get-ChildItem $directory | ForEach-Object { (Get-Acl $_.FullName).Access | Where-Object { $_.IdentityReference -is [System.Security.Principal.NTAccount] } | Select-Object -ExpandProperty IdentityReference } | ForEach-Object { $_.ToString().ToLower() } | Select-Object -Unique
+        $folders = (Get-ChildItem $directory -Directory).FullName
+        foreach ($dir in $directories) {
+            write-host $dir
+            $availableGroupsTextBox.AppendText("$dir`r`n")  # Dodaj wyniki do $availableGroupsTextBox z nową linią po każdym wyniku
         }
-    })
-    $mainForm.Controls.Add($buttonSubmitPath)
+        foreach($f in $folders)
+        {
+            $availableDirectoriesTextBox.AppendText("$f`r`n")
+        }
+        $buttonInheritance.Enabled = $true
+    } else {
+        # Jeśli wprowadzony tekst nie jest poprawną ścieżką katalogu, wyświetl komunikat
+        [System.Windows.Forms.MessageBox]::Show("Wprowadzona ścieżka nie jest poprawna.", "Błąd", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+    }
+})
+$mainForm.Controls.Add($buttonSubmitPath)
+
 
     $labelGroups = New-Object System.Windows.Forms.Label
     $labelGroups.Text = "Wprowadź grupy do usunięcia uprawnień:"
@@ -158,13 +179,6 @@ $mainForm.Controls.Add($buttonSubmitCommand)
     $mainForm.Controls.Add($buttonInheritance)
 
 
-    # Pole tekstowe dla dostępnych grup
-$availableGroupsTextBox = New-Object System.Windows.Forms.TextBox
-$availableGroupsTextBox.Location = New-Object System.Drawing.Point(10, 230)
-$availableGroupsTextBox.Size = New-Object System.Drawing.Size(200, 60)
-$availableGroupsTextBox.Multiline = $true
-$availableGroupsTextBox.ScrollBars = "Both"
-$mainForm.Controls.Add($availableGroupsTextBox)
 
 # Etykieta dla opisu "Lista dostępnych grup"
 $labelAvailableGroups = New-Object System.Windows.Forms.Label
@@ -172,14 +186,6 @@ $labelAvailableGroups.Text = "Lista dostępnych grup:"
 $labelAvailableGroups.Location = New-Object System.Drawing.Point(10, 210)
 $labelAvailableGroups.Width = 150
 $mainForm.Controls.Add($labelAvailableGroups)
-
-# Pole tekstowe z dostępnymi podfolderami danego folderu
-$availableDirectoriesTextBox = New-Object System.Windows.Forms.TextBox
-$availableDirectoriesTextBox.Location = New-Object System.Drawing.Point(230, 230)
-$availableDirectoriesTextBox.Size = New-Object System.Drawing.Size(200, 60)
-$availableDirectoriesTextBox.Multiline = $true
-$availableDirectoriesTextBox.ScrollBars = "Both"
-$mainForm.Controls.Add($availableDirectoriesTextBox)
 
 # Etykieta dla opisu "Lista dostępnych grup"
 $labelAvailableDirectories = New-Object System.Windows.Forms.Label
